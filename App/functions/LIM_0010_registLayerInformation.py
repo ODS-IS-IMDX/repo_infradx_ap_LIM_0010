@@ -134,7 +134,7 @@ def read_csv(file_path):
             layer_information_list = [row for row in reader]
             return layer_information_list
     except Exception:
-        logger.error("BPE0007")
+        logger.error("BPE0007", file_path)
         logger.process_error_end()
 
 
@@ -218,7 +218,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # 設備小項目名チェック
         # 必須チェック
-        if not fac_subitem_name:
+        if not Validations.is_required_for_csv(fac_subitem_name):
             logger.error("BPE0024", FAC_SUBITEM_NAME, row_count, layer_infomation)
             logger.process_error_end()
 
@@ -229,7 +229,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # 最終断面種別チェック
         # 必須チェック
-        if not final_cross_section_type:
+        if not Validations.is_required_for_csv(final_cross_section_type):
             logger.error(
                 "BPE0024", FINAL_CROSS_SECTION_TYPE, row_count, layer_infomation
             )
@@ -248,7 +248,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # 認可パターンチェック
         # 必須チェック
-        if not authorization_pattern:
+        if not Validations.is_required_for_csv(authorization_pattern):
             logger.error("BPE0024", AUTHORIZATION_PATTERN, row_count, layer_infomation)
             logger.process_error_end()
 
@@ -259,7 +259,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # レイヤ名チェック
         # 必須チェック
-        if not layer_name:
+        if not Validations.is_required_for_csv(layer_name):
             logger.error("BPE0024", LAYER_NAME, row_count, layer_infomation)
             logger.process_error_end()
 
@@ -270,7 +270,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # レイヤ概要チェック
         # 必須チェック
-        if not layer_summary:
+        if not Validations.is_required_for_csv(layer_summary):
             logger.error("BPE0024", LAYER_SUMMARY, row_count, layer_infomation)
             logger.process_error_end()
 
@@ -281,7 +281,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # 利用開始年月日チェック
         # 必須チェック
-        if not start_date_of_use:
+        if not Validations.is_required_for_csv(start_date_of_use):
             logger.error("BPE0024", START_DATE_OF_USE, row_count, layer_infomation)
             logger.process_error_end()
 
@@ -293,7 +293,7 @@ def validate_layer_information_rows(layer_information_list):
 
         # 利用終了年月日チェック
         # 必須チェック
-        if not end_date_of_use:
+        if not Validations.is_required_for_csv(end_date_of_use):
             logger.error("BPE0024", END_DATE_OF_USE, row_count, layer_infomation)
             logger.process_error_end()
 
