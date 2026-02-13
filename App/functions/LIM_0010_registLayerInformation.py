@@ -1,3 +1,5 @@
+# © 2026 NTT DATA Japan Co., Ltd. & NTT InfraNet All Rights Reserved.
+
 """
 LIM_0010_registLayerInformation.py
 
