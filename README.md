@@ -45,7 +45,7 @@
 5. Pythonスクリプトを実行します。
     ```bash
     cd App/functions
-    python LIM_0010_registLayerInformation.py --file_name=<ファイル名>
+    python LIM_0010_registLayerInformation.py --filename=<ファイル名>
     ```
     ※ファイル名は必須パラメータです（接頭辞: "layer_information_"、拡張子: ".csv"）
 

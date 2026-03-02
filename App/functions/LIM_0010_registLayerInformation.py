@@ -16,7 +16,7 @@ LIM_0010_registLayerInformation.py
 
 実行コマンド形式:
     python3 [バッチ格納先パス]/LIM_0010_registLayerInformation.py
-    --file_name=[ファイル名]
+    --filename=[ファイル名]
 """
 
 import argparse
@@ -44,6 +44,7 @@ config = read_config(logger)
 DDL_FOLDER = config["folderPass"]["ddl_folder"].strip()
 LAYER_CSV_WORK_FOLDER = config["folderPass"]["layer_csv_work_folder"].strip()
 FAC_SUBITEM_NAME = config["constant"]["fac_subitem_name"].strip()
+GEOMETRY_TYPE = config["constant"]["geometry_type"].strip()
 FINAL_CROSS_SECTION_TYPE = config["constant"]["final_cross_section_type"].strip()
 AUTHORIZATION_PATTERN = config["constant"]["authorization_pattern"].strip()
 LAYER_NAME = config["constant"]["layer_name"].strip()
@@ -58,7 +59,7 @@ def parse_args():
     try:
         # 完全一致のみ許可
         parser = argparse.ArgumentParser(allow_abbrev=False, exit_on_error=False)
-        parser.add_argument("--file_name", required=False)
+        parser.add_argument("--filename", required=False)
         return parser.parse_args()
     except Exception as e:
         # コマンドライン引数の解析に失敗した場合
@@ -83,7 +84,7 @@ def validate_file_name(file_name):
         logger.error("BPE0019", "ファイル名", file_name)
         logger.process_error_end()
 
-    # 接頭辞が"layer_information_"と拡張子".csv"を除去し公益事業者・道路管理者コードとして使用
+    # 接頭辞"layer_information_"と拡張子".csv"を除去し公益事業者・道路管理者コードとして使用
     provider_code = file_name[
         # fmt: off
         len(Constants.PREFIX_LAYER_INFORMATION):-len(Constants.SUFFIX_CSV)
@@ -100,7 +101,7 @@ def validate_file_name(file_name):
         logger.error("BPE0019", "ファイル名", file_name)
         logger.process_error_end()
 
-    # 入力値チェック完了後、テンプレートIDを返す
+    # 入力値チェック完了後、公益事業者・道路管理者コードを返す
     return provider_code
 
 
@@ -142,14 +143,15 @@ def read_csv(file_path):
 
 # 7. ヘッダー項目チェック
 def validate_header(header):
-    # 全体の列数が7であること
-    if not len(header) == 7:
+    # 全体の列数が8であること
+    if not len(header) == 8:
         logger.error("BPE0010", "1", header)
         logger.process_error_end()
 
     # ヘッダーを展開
     (
         fac_subitem_name,
+        geometry_type,
         final_cross_section_type,
         authorization_pattern,
         layer_name,
@@ -162,6 +164,10 @@ def validate_header(header):
     # 設備小項目名
     if not fac_subitem_name == FAC_SUBITEM_NAME:
         logger.error("BPE0026", FAC_SUBITEM_NAME, "1", header)
+        logger.process_error_end()
+    # ジオメトリタイプ
+    if not geometry_type == GEOMETRY_TYPE:
+        logger.error("BPE0026", GEOMETRY_TYPE, "1", header)
         logger.process_error_end()
     # 最終断面種別
     if not final_cross_section_type == FINAL_CROSS_SECTION_TYPE:
@@ -202,14 +208,15 @@ def validate_layer_information_rows(layer_information_list):
         layer_information_list[1:], start=2
     ):  # ヘッダーを除く
 
-        # 全体の列数が7であること
-        if not len(layer_infomation) == 7:
+        # 全体の列数が8であること
+        if not len(layer_infomation) == 8:
             logger.error("BPE0010", row_count, layer_infomation)
             logger.process_error_end()
 
         # テンプレートを展開
         (
             fac_subitem_name,
+            geometry_type,
             final_cross_section_type,
             authorization_pattern,
             layer_name,
@@ -229,6 +236,27 @@ def validate_layer_information_rows(layer_information_list):
             logger.error("BPE0026", FAC_SUBITEM_NAME, row_count, layer_infomation)
             logger.process_error_end()
 
+        # ジオメトリタイプチェック
+        # 必須チェック
+        if not Validations.is_required_for_csv(geometry_type):
+            logger.error("BPE0024", GEOMETRY_TYPE, row_count, layer_infomation)
+            logger.process_error_end()
+
+        # アンダースコア区切りで分割
+        geometry_type_parts = geometry_type.split("_")
+        if (
+            # 桁数（1以上18以下）
+            not Validations.is_valid_length(geometry_type, 1, 18)
+            # 半角英字とアンダースコアのみで構成されているか
+            or not Validations.is_al_underscore(geometry_type)
+            # ジオメトリタイプリストのいずれかの値であること
+            or not Validations.is_value_in_list(
+                geometry_type_parts, Constants.GEOMETRY_TYPE_LIST
+            )
+        ):
+            logger.error("BPE0026", GEOMETRY_TYPE, row_count, layer_infomation)
+            logger.process_error_end()
+
         # 最終断面種別チェック
         # 必須チェック
         if not Validations.is_required_for_csv(final_cross_section_type):
@@ -241,7 +269,9 @@ def validate_layer_information_rows(layer_information_list):
             # 半角数字1文字で構成されているか
             not Validations.is_single_digit(final_cross_section_type)
             # 最終断面リストのいずれかの値であること
-            or not int(final_cross_section_type) in Constants.FINAL_CROSS_SECTION_LIST
+            or not Validations.is_value_in_list(
+                int(final_cross_section_type), Constants.FINAL_CROSS_SECTION_LIST
+            )
         ):
             logger.error(
                 "BPE0026", FINAL_CROSS_SECTION_TYPE, row_count, layer_infomation
@@ -422,6 +452,8 @@ def modify_layer_information_list(
     authorization_pattern_codelist,
     fac_subitem_codelist,
 ):
+    # ジオメトリタイプリスト
+    geometry_type_list = []
     # レイヤIDリスト
     layer_id_list = []
     # 最終断面認可リスト
@@ -437,6 +469,7 @@ def modify_layer_information_list(
         # 各項目を取得
         (
             fac_subitem_name,
+            geometry_type,
             final_cross_section_type,
             authorization_pattern,
             layer_name,
@@ -465,28 +498,42 @@ def modify_layer_information_list(
                 Constants.FINAL_CROSS_SECTION_INTERMEDIATE_SUFFIX_3D
             )
 
-        # レイヤID作成：[設備小項目英名][最終断面識別子][公益事業者・道路管理者ID]
-        layer_id = f"{fac_subitem_eng}{final_cross_section_identifier}{provider_id}"
+        # ジオメトリタイプをアンダースコア区切りで分割してジオメトリタイプリストに追加
+        geometry_type_list = geometry_type.split("_")
 
-        # 修正後のレイヤ情報リストに追加
-        # [設備小項目ID, 最終断面種別, 認可パターンID, レイヤID, レイヤ名, レイヤ概要, 利用開始年月日, 利用終了年月日]
-        modified_layer_information = [
-            fac_subitem_id,
-            final_cross_section_type_int,
-            authorization_pattern_id,
-            layer_id,
-            layer_name,
-            layer_summary,
-            start_date_of_use,
-            end_date_of_use,
-        ]
-        modified_layer_information_list.append(modified_layer_information)
+        for geometry_type in geometry_type_list:
+            # レイヤID作成：[設備小項目英名]_[ジオメトリタイプ][最終断面識別子][公益事業者・道路管理者ID]
+            layer_id = (
+                f"{fac_subitem_eng}_{geometry_type}"
+                f"{final_cross_section_identifier}{provider_id}"
+            )
 
-        # 13-5. レイヤIDリスト、最終断面認可リスト追加
-        layer_id_list.append(layer_id)
-        final_cross_section_authorization_list.append(
-            (fac_subitem_id, provider_id, final_cross_section_type_int)
-        )
+            # 修正後のレイヤ情報リストに追加
+            # [設備小項目ID, ジオメトリタイプ, 最終断面種別, 認可パターンID,
+            # レイヤID, レイヤ名, レイヤ概要, 利用開始年月日, 利用終了年月日]
+            modified_layer_information = [
+                fac_subitem_id,
+                geometry_type,
+                final_cross_section_type_int,
+                authorization_pattern_id,
+                layer_id,
+                layer_name,
+                layer_summary,
+                start_date_of_use,
+                end_date_of_use,
+            ]
+            modified_layer_information_list.append(modified_layer_information)
+
+            # 13-5. レイヤIDリスト、最終断面認可リスト追加
+            layer_id_list.append(layer_id)
+            final_cross_section_authorization_list.append(
+                (fac_subitem_id, provider_id, final_cross_section_type_int)
+            )
+
+    # 最終断面認可リストの重複を削除
+    final_cross_section_authorization_list = list(
+        dict.fromkeys(final_cross_section_authorization_list)
+    )
 
     return (
         modified_layer_information_list,
@@ -509,7 +556,7 @@ def check_vector_layer_exists(db_connection, db_mst_schema, layer_id_list, logge
         fetchall=True,
     )
     if result:
-        logger.error("BPE0021", result)
+        logger.error("BPE0021", [t[0] for t in result])
         logger.process_error_end()
 
 
@@ -542,9 +589,10 @@ def insert_vector_layer_and_final_cross_section_authorization(
     # ベクタレイヤマスタにデータを登録
     vector_layer_query = (
         f"INSERT INTO {db_mst_schema}.mst_vector_layer "
-        "(layer_id, layer_name, layer_summary, provider_id, "
+        "(layer_id, layer_name, layer_summary, fac_subitem_id, "
+        "final_cross_section_type, geometry_type, provider_id, "
         "start_date_of_use, end_date_of_use, created_by, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     )
 
     # 最終断面認可マスタにデータを登録
@@ -555,11 +603,15 @@ def insert_vector_layer_and_final_cross_section_authorization(
         "VALUES (%s, %s, %s, %s, %s, %s)"
     )
 
+    # 一意制約チェックタプルリスト
+    unique_tuple_list = []
+
     with db_connection as conn:
         for layer_information in layer_information_list:
             # 各項目を展開
             (
                 fac_subitem_id,
+                geometry_type,
                 final_cross_section_type_int,
                 authorization_pattern_id,
                 layer_id,
@@ -577,6 +629,9 @@ def insert_vector_layer_and_final_cross_section_authorization(
                     layer_id,
                     layer_name,
                     layer_summary,
+                    fac_subitem_id,
+                    final_cross_section_type_int,
+                    geometry_type,
                     provider_id,
                     start_date_of_use,
                     end_date_of_use,
@@ -584,6 +639,18 @@ def insert_vector_layer_and_final_cross_section_authorization(
                     current_time,
                 ),
             )
+
+            # 一意制約チェックタプル
+            unique_tuple = (
+                fac_subitem_id,
+                provider_id,
+                final_cross_section_type_int,
+            )
+
+            # 既に登録済みの場合はスキップ
+            if unique_tuple in unique_tuple_list:
+                continue
+
             Database.execute_query_no_commit(
                 conn,
                 logger,
@@ -597,6 +664,10 @@ def insert_vector_layer_and_final_cross_section_authorization(
                     current_time,
                 ),
             )
+
+            # 一意制約チェックタプルリストに追加
+            unique_tuple_list.append(unique_tuple)
+
         # 全ての登録処理が成功した場合のみコミット
         conn.commit()
 
@@ -607,8 +678,8 @@ def log_registered_vector_layer(layer_information_list):
     layer_set_list = []
 
     for layer_information in layer_information_list:
-        layer_id = layer_information[3]
-        layer_name = layer_information[4]
+        layer_id = layer_information[4]
+        layer_name = layer_information[5]
         layer_set = f"[レイヤID:{layer_id}, レイヤ名:{layer_name}]"
         layer_set_list.append(layer_set)
 
@@ -732,7 +803,7 @@ def main():
         logger.process_start()
 
         # 起動パラメータの取得
-        file_name = parse_args().file_name
+        file_name = parse_args().filename
 
         # 1. 入力値チェック
         provider_code = validate_file_name(file_name)
