@@ -116,29 +116,29 @@ def check_csv_file_exists(file_path):
 # 3. CSVファイル文字コード確認
 def check_csv_encoding(file_path):
     # CSVファイルの文字コードがUTF-8であること
-    with open(file_path, "rb") as f:
-        rawdata = f.read()
-        result = chardet.detect(rawdata)
-        detected_encoding = result["encoding"]
+    try:
+        with open(file_path, "rb") as f:
+            rawdata = f.read()
+            result = chardet.detect(rawdata)
+            detected_encoding = result["encoding"]
 
-    if not (detected_encoding.upper() == Constants.CHARACTER_ENCODING_UTF_8):
-        logger.error("BPE0008", file_path)
+        if not (detected_encoding.upper() == Constants.CHARACTER_ENCODING_UTF_8):
+            logger.error("BPE0008", file_path)
+            logger.process_error_end()
+    except Exception:
+        logger.error("BPE0007", file_path)
         logger.process_error_end()
 
 
 # 6. CSVファイル読み込み（レイヤ情報リスト作成）
 def read_csv(file_path):
     # CSVファイルを読み込みレイヤ情報リストを作成
-    try:
-        with open(
-            file_path, mode="r", encoding=Constants.CHARACTER_ENCODING_UTF_8
-        ) as csv_file:
-            reader = csv.reader(csv_file)
-            layer_information_list = [row for row in reader]
-            return layer_information_list
-    except Exception:
-        logger.error("BPE0007", file_path)
-        logger.process_error_end()
+    with open(
+        file_path, mode="r", encoding=Constants.CHARACTER_ENCODING_UTF_8
+    ) as csv_file:
+        reader = csv.reader(csv_file)
+        layer_information_list = [row for row in reader]
+        return layer_information_list
 
 
 # 7. ヘッダー項目チェック
